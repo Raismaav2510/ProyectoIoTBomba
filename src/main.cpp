@@ -4,19 +4,21 @@
 
 const int BombaPin = 2;
 
-const char* ssid = "Next";  // Tu SSID
-const char* password = ":v123456789";  //Tu Clave
+const char* ssid = "MaAv-Mesh";  // Tu SSID
+const char* password = "u5b2nUb3sP";  //Tu Clave
 
 float hD = 0;
+int rain = 0;
+int ciclos = 0;
 
 void apiConnection() {
     HTTPClient http;
-    http.begin("http://192.168.1.110/iot/iotWaterPump.php");
+    http.begin("http://192.168.3.75/iot/iotDevicesAPI/iotWaterPump.php");
     http.addHeader("Content-Type", "application/x-www-form-urlencoded");
     int httpCode = http.GET();
 
     if (httpCode > 0) {
-        Serial.println("HTTP - " + String(httpCode));
+        Serial.println("Sns HTTP - " + String(httpCode));
         if (httpCode == 200){
             String response = http.getString();
             hD = response.toFloat();
@@ -28,6 +30,24 @@ void apiConnection() {
     http.end();
 }
 
+void apiPrediction() {
+    HTTPClient http;
+    http.begin("http://192.168.3.75/iot/iotDevicesAPI/iotGetPrediction.php");
+    http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+    int httpCode = http.GET();
+
+    if (httpCode > 0) {
+        Serial.println("ML HTTP - " + String(httpCode));
+        if (httpCode == 200){
+            String response = http.getString();
+            rain = response.toInt();
+            Serial.println(rain);
+        }
+    } else {
+        Serial.println("HTTP - " + String(httpCode));
+    }
+    http.end();
+}
 
 void setup() {
     pinMode(BombaPin, OUTPUT);
@@ -49,18 +69,39 @@ void setup() {
     Serial.println(ssid);
     Serial.print("Direccion IP: ");
     Serial.println(WiFi.localIP());
-
+    apiPrediction();
+    apiConnection();
     delay(5000);
 }
 
 void loop() {
+    ciclos++;
     apiConnection();
-    if (hD > 60) {
+
+    if (ciclos == 10) {
+        apiPrediction();
+        ciclos = 0;
+    }
+
+    if (rain == 0) {
+        if (hD > 60) {
+            digitalWrite(BombaPin, LOW);
+            Serial.println("Bomba: Off");
+        } if (hD < 30) {
+            digitalWrite(BombaPin, HIGH);
+            Serial.println("Bomba: on");
+        }
+    } else if (rain != 0 && hD < 10) {
+        if (hD > 60) {
+            digitalWrite(BombaPin, LOW);
+            Serial.println("Bomba: Off");
+        } if (hD < 30) {
+            digitalWrite(BombaPin, HIGH);
+            Serial.println("Bomba: on");
+        }
+    } else {
         digitalWrite(BombaPin, LOW);
         Serial.println("Bomba: Off");
-    } if (hD < 30) {
-        digitalWrite(BombaPin, HIGH);
-        Serial.println("Bomba: on");
     }
     delay(5000);
 }
